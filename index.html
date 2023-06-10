@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>chatapp</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="header-layout">
+        <h1 class="title">チャットアプリ</h1>
+        <p id="status"> Login... </p>
+        <div class="header-item">
+            <button id="out">ログアウト</button>
+            <div class="header">
+                <p><img src="" id="prof" class="hedaer-prof"></p>
+                <p id="uname"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- コンテンツ表示画面 -->
+    <div class="contents">
+        <div id="output"></div>
+        <div class="input-area">
+            <input id="text" class="input-text"  type="text" placeholder="今日の最高の出来事は？？"></input>
+            <button id="send" class="button">送信</button>
+        </div>
+        
+    </div>
+    
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script type="module">
+//###############################################
+// 必要なJSを読み込み
+//###############################################
+import { initializeApp } 
+    from "https://www.gstatic.com/firebasejs/9.13.0/firebase-app.js";
+import { getDatabase, ref, push, set, onValue, onChildAdded, remove, onChildRemoved } 
+    from "https://www.gstatic.com/firebasejs/9.13.0/firebase-database.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } 
+    from "https://www.gstatic.com/firebasejs/9.13.0/firebase-auth.js";
+ 
+
+//###############################################
+//FirebaseConfig [ KEYを取得して設定！！ ]
+//###############################################
+const firebaseConfig = {
+
+};
+const app = initializeApp(firebaseConfig);
+
+
+//###############################################
+//Firebase-RealtimeDatabase接続
+//###############################################
+const db  = getDatabase(app); //RealtimeDBに接続
+const dbRef = ref(db, "chat"); //RealtimeDB内の"chat"を使う
+
+//###############################################
+//GoogleAuth用
+//###############################################
+const provider = new GoogleAuthProvider();
+provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
+const auth = getAuth();
+
+
+//###############################################
+//Loginしていれば処理します
+//###############################################
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // User is signed in, see docs for a list of available properties
+        // https://firebase.google.com/docs/reference/js/firebase.User
+        const uid = user.uid;
+        //ユーザー情報取得できます
+        if (user !== null) {
+            user.providerData.forEach((profile) => {
+                //Login情報取得
+                $("#uname").text(profile.displayName);
+                $("#prof").attr("src",profile.photoURL);
+                // console.log("Sign-in provider: " + profile.providerId);
+                // console.log("Provider-specific UID: " + profile.uid);
+                // console.log("Email: " + profile.email);
+                // console.log("Photo URL: " + profile.photoURL);
+            });
+            $("#status").fadeOut(500);
+        }
+        //データ登録(Click)
+        $("#send").on('click',function(){
+
+            // const unameVale = $("#uname").text(profile.displayName);
+            // const uprofVale = $("#prof").attr("src",profile.photoURL);
+
+            const msg = {
+                    uname: $("#uname").text(),
+                    prof: $("#prof").attr('src'),
+                    text: $("#text").val()
+            }
+            const newPostRef = push(dbRef); //ユニークkeyの作成
+            set(newPostRef, msg);
+            console.log(msg);
+
+            let text = $("#text").val("");
+        })
+       
+        //最初にデータ取得＆onSnapshotでリアルタイムにデータを取得
+        onChildAdded(dbRef, function(data) {
+            const msg = data.val();
+            const key = data.key;
+
+            let layoutClass = '';
+            if (msg.uname === "takanobu tsujinouchi") {
+                layoutClass = 'layout-msg-r';
+            } else if (msg.uname === "gao reo") {
+                layoutClass = 'layout-msg-l';
+            }
+
+            let h = `
+                <div class="${layoutClass}">
+                    <div class="img"><img src="${msg.prof}"><p class="name">${msg.uname}</p></div>
+                    <div class="layout-btn-msg-r">
+                        <p class="says">${msg.text}</p>
+                        <button class="delete" data-key="${key}">削除</button>
+                    </div>
+                </div>
+            `
+
+            $("#output").append(h);
+
+            // DOMの更新を監視するためのMutationObserverを作成します。
+            const observer = new MutationObserver(function() {
+            // 更新が終わったらイベントハンドラを設定します。
+                $(".delete").off("click").on("click", function() {
+                let thisKey = $(this).attr("data-key");
+                const dbRefDelete = ref(db, "chat/" + thisKey); 
+
+                console.log(thisKey);
+                remove(dbRefDelete);
+            });
+
+            // 監視を終了します。
+            observer.disconnect();
+            });
+
+            // #output要素の子要素の変更を監視を開始します。
+            observer.observe($("#output")[0], { childList: true });
+        });
+
+    } else {
+        _redirect();  // User is signed out
+    }
+});
+
+
+//###############################################
+//Logout処理
+//###############################################
+$("#out").on("click", function () {
+    // signInWithRedirect(auth, provider);
+    signOut(auth).then(() => {
+        // Sign-out successful.
+        _redirect();
+    }).catch((error) => {
+        // An error happened.
+        console.error(error);
+    });
+});
+
+
+//###############################################
+//Login画面へリダイレクト(関数作成)
+//###############################################
+function _redirect(){
+    location.href="login.html";
+}
+
+</script>
+</body>
+</html>
